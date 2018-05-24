@@ -1,0 +1,64 @@
+version: '3.5'
+services:
+
+  cadvisor:
+   image: google/cadvisor:latest
+   deploy:
+     mode: global
+   command: --prometheus_endpoint="/metrics"
+   networks:
+     -  traefik
+   ports:
+     - "8088:8080"
+   volumes:
+     - /:/rootfs:ro
+     - /var/run:/var/run:rw
+     - /sys:/sys:ro
+     - /var/lib/docker/:/var/lib/docker:ro
+     - /dev/disk:/dev/disk
+
+  prometheus:
+    image: prom/prometheus
+    command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention=1d
+    ports:
+      - 9099:9090
+    networks:
+      - traefik
+    volumes:
+      - /gfs_mount/dswarm_service_gfs_volume/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - /gfs_mount/dswarm_service_gfs_volume/prometheus:/prometheus
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.frontend.passHostHeader=true"
+        - "traefik.frontend.rule=Host:prometheus.vlekh.net, http://prometheus.vlekh.net"
+        - "traefik.frontend.headers.SSLRedirect=true"
+        - "traefik.frontend.redirect.entryPoint=https"
+        - "traefik.backend=monitor_prometheus"
+        - "traefik.docker.network=traefik"
+        - "traefik.entryPoint=https"
+        - "traefik.port=9090"
+
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3031:3000
+    networks:
+      - traefik
+    volumes:
+      - /gfs_mount/dswarm_service_gfs_volume/grafana:/var/lib/grafana 
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.frontend.passHostHeader=true"
+        - "traefik.frontend.rule=Host:grafana.vlekh.net, http://grafana.vlekh.net"
+        - "traefik.backend=monitor_grafana"
+        - "traefik.docker.network=traefik"
+        - "traefik.entryPoint=https"
+        - "traefik.port=3000"
+
+networks:
+  traefik:
+    external: true
+    name: traefik
